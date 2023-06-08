@@ -46,8 +46,15 @@ void unixtodt(unsigned int unix){
     int hour = timeinfo->tm_hour;
     int minute = timeinfo->tm_min;
     int second = timeinfo->tm_sec;
-    //Serial.println(string(day)+"/"+string(month)+"/"+string(year));
-    //Serial.println(string(hour)+":"+string(minute)+":"+string(second));
+    Serial.print(day);
+    Serial.print("/");
+    Serial.print(month);
+    Serial.print("/");
+    Serial.println(year);
+    Serial.print(hour);
+    Serial.print(":");
+    Serial.print(minute);
+    Serial.print(":");
     Serial.println(second);
 
 }
@@ -55,6 +62,14 @@ void setup(void)
 {
   // start serial port
   Serial.begin(9600);
+    if (! rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+    Serial.flush();
+    while (1) delay(10);
+  }
+
+  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    
   Serial.println("Dallas Temperature IC Control Library Demo");
   EEPROM.begin(512);
   // Start up the library
@@ -66,10 +81,7 @@ void setup(void)
   }
   // Start ds1037 
   Wire.begin();
-  if (!rtc.begin()) {
-      Serial.println(F("DS1307 không kết nối được."));
-      while (true);
-    }
+
     
   display.clearDisplay();
 
@@ -78,13 +90,16 @@ void setup(void)
 /*
  * Main function, get and show the temperature
  */
-void loop(void)
-{ 
+
+void start(){
   // call sensors.requestTemperatures() to issue a global temperature 
   // request to all devices on the bus
   Serial.println("Requesting temperatures and date time");
   sensors.requestTemperatures(); // Send the command to get temperatures
+
   DateTime now = rtc.now();
+  Serial.flush();
+
   //Serial.println("DONE");
   // After we got the temperatures, we can print them here.
   // We use the function ByIndex, and as an example get the temperature from the first sensor only.
@@ -93,23 +108,23 @@ void loop(void)
   if(tempC != DEVICE_DISCONNECTED_C) 
   { //write data to EEPROM  
     //Serial.println(now.unixtime());
-    if (address >= 512){
+    if (address >= 80){
       address = 0;
     }
     
     EEPROM.put(address,tempC);
     EEPROM.put(address+sizeof(float),now.unixtime());
     EEPROM.commit();
-    // read data
-    float temp ;
-    EEPROM.get(address,temp);
-    unsigned int unixsecs;
-    EEPROM.get(address+sizeof(float),unixsecs);
-    Serial.print("Temperature for the device 1 (index 0) is: ");
-    Serial.println(unixsecs/86400L);
-    unixtodt(unixsecs);
-    Serial.println(temp);
-    
+    // // read data
+    // float temp ;
+    // EEPROM.get(address,temp);
+    // unsigned int unixsecs;
+    // EEPROM.get(address+sizeof(float),unixsecs);
+    // // //Serial.print("Unix time: ");
+    // // //Serial.println(unixsecs);
+    // unixtodt(unixsecs);
+    // Serial.println(temp);
+    // Serial.print(address);
     address += sizeof(unsigned int);
     
     display.clearDisplay();
@@ -188,4 +203,38 @@ void loop(void)
     delay(3000);
   }
   delay(1000);
+}
+int check = 0;
+
+void loop(void)
+{ 
+  if (check == 1){
+    start();
+  }  
+  String receivedString = Serial.readStringUntil('\n');
+  if (receivedString.equals("start")){
+    check = 1;
+  }
+  if (receivedString.equals("stop")){
+    check = 0;
+    delay(10000);
+  }
+  if (receivedString.equals("read")){
+    int a ;
+    float temp ;
+    unsigned int unixsecs;
+
+    for(int i = 0;i<10;i++){
+      a = i*8;
+      EEPROM.get(a,temp);
+      EEPROM.get(a+sizeof(float),unixsecs);
+      //Serial.print("Unix time: ");
+      //Serial.println(unixsecs);
+      unixtodt(unixsecs);
+      Serial.println(temp);
+      Serial.println(a);
+      Serial.println("------------------");
+    }
+  }
+
 }
